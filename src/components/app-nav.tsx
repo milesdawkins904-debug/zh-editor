@@ -2,7 +2,8 @@ import { Link, useRouterState } from "@tanstack/react-router";
 
 const LINKS = [
   { to: "/", label: "Loot table" },
-  { to: "/clothing", label: "NPC clothing" },
+  { to: "/clothing", label: "NPC table" },
+  { to: "/settings", label: "Horde settings" },
 ] as const;
 
 export function AppNav() {
