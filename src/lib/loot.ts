@@ -168,3 +168,59 @@ export function rowsOf(cfg: ZhConfig) {
 export function tableOf(cfg: ZhConfig) {
   return cfg["Loot Table"][KEYS.table];
 }
+
+export type RolledDrop = {
+  row: LootRow | SpawnWith;
+  amount: number;
+  companion: boolean;
+};
+
+export type CorpseRoll = {
+  mode: "table" | "inventory" | "murderer";
+  slotsWanted: number;
+  drops: RolledDrop[];
+};
+
+function stackAmount(min: number, max: number) {
+  const lo = Math.min(num(min, 1), num(max, 1));
+  const hi = Math.max(num(min, 1), num(max, 1));
+  return lo + Math.floor(Math.random() * (hi - lo + 1));
+}
+
+/** One corpse, matching ZombieHorde: pick a slot count, shuffle the table, keep a row when its probability beats a fresh 0–1 roll, stop at the slot count. Spawn-with items ride along and do not take a slot. */
+export function rollCorpse(cfg: ZhConfig): CorpseRoll {
+  const loot = cfg["Loot Table"];
+  if (loot[KEYS.dropInv]) return { mode: "inventory", slotsWanted: 0, drops: [] };
+  if (loot[KEYS.dropMurder]) return { mode: "murderer", slotsWanted: 0, drops: [] };
+
+  const table = tableOf(cfg);
+  const minSlots = Math.max(0, num(table[KEYS.min], 0));
+  const maxSlots = Math.max(minSlots, num(table[KEYS.max], minSlots));
+  const slotsWanted = minSlots + Math.floor(Math.random() * (maxSlots - minSlots + 1));
+  const pool = [...rowsOf(cfg)];
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const swap = pool[i];
+    pool[i] = pool[j];
+    pool[j] = swap;
+  }
+
+  const drops: RolledDrop[] = [];
+  let filled = 0;
+  for (const row of pool) {
+    if (filled >= slotsWanted) break;
+    const p = Number(row["Probability (0.0 - 1.0)"]) || 0;
+    if (Math.random() > p) continue;
+    drops.push({ row, amount: stackAmount(row.Minimum, row.Maximum), companion: false });
+    filled += 1;
+    const withItem = row["Spawn with"];
+    if (withItem?.Shortname) {
+      drops.push({
+        row: withItem,
+        amount: stackAmount(withItem.Minimum, withItem.Maximum),
+        companion: true,
+      });
+    }
+  }
+  return { mode: "table", slotsWanted, drops };
+}

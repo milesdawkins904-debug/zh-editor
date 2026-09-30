@@ -1,5 +1,5 @@
 {
-  "url": "http://127.0.0.1:8080/",
+  "url": "http://127.0.0.1:8080/clothing",
   "viewports": {
     "desktop": {
       "width": 1280,
@@ -7,13 +7,13 @@
       "status": 200,
       "title": "Zombie Horde Loot Editor",
       "hasCanvas": false,
-      "bodyTextLen": 9187,
-      "bodyTextHash": "daee7b09793a521d26e4089c1071e5c3ab1ee9a4673dae6dc9fa6ff1325752bc",
-      "bodyTextPrefix": "ZH Zombie Horde Loot Editor ZombieHorde.json · random loot table",
+      "bodyTextLen": 1767,
+      "bodyTextHash": "59a7aae8f009fd437bd29ac51e30b6f4e450e4328e52c25065bc733d94cbde2c",
+      "bodyTextPrefix": "Loot table NPC clothing NPC clothing Wear items on each horde lo",
       "horizontalOverflow": false,
       "consoleErrors": [],
       "pageErrors": [],
-      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+      "screenshot": "/workspace/screenshots/clothing.png"
     },
     "mobile": {
       "width": 390,
@@ -21,18 +21,18 @@
       "status": 200,
       "title": "Zombie Horde Loot Editor",
       "hasCanvas": false,
-      "bodyTextLen": 9187,
-      "bodyTextHash": "daee7b09793a521d26e4089c1071e5c3ab1ee9a4673dae6dc9fa6ff1325752bc",
-      "bodyTextPrefix": "ZH Zombie Horde Loot Editor ZombieHorde.json · random loot table",
+      "bodyTextLen": 1767,
+      "bodyTextHash": "59a7aae8f009fd437bd29ac51e30b6f4e450e4328e52c25065bc733d94cbde2c",
+      "bodyTextPrefix": "Loot table NPC clothing NPC clothing Wear items on each horde lo",
       "horizontalOverflow": false,
       "consoleErrors": [],
       "pageErrors": [],
-      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+      "screenshot": "/workspace/screenshots/clothing-mobile.png"
     }
   },
   "brandWarnings": [
     "BRAND NOTE: no custom public/og.jpg — the platform will serve the og.grok.me placeholder. Custom cards are the default for games of every kind (DOM board/word games included), whimsical apps, creative tools, and brand-forward pages — only plain utilities (converters, CRUD trackers, admin dashboards) keep the placeholder. If this app is not a plain utility, finish the brand-asset pass per /workspace/.grok/skills/og/SKILL.md."
   ],
   "authWarnings": [],
-  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+  "verdictFile": "/workspace/screenshots/clothing.json"
 }

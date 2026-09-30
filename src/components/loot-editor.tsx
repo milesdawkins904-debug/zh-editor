@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Copy, Download, FolderOpen, Plus, RotateCcw, Search, Skull, Trash2, X } from "lucide-react";
+import { AppNav } from "@/components/app-nav";
+import { useEditor } from "@/lib/editor-store";
+import { Copy, Download, Dices, FolderOpen, LayoutGrid, List, Plus, RefreshCw, RotateCcw, Search, Skull, Trash2, X } from "lucide-react";
 import {
   CATEGORIES,
   CATALOG,
@@ -14,29 +16,56 @@ import {
   itemIcon,
   normalizeLoaded,
   num,
+  rollCorpse,
   rowsOf,
   tableOf,
+  type CorpseRoll,
   type LootRow,
   type ZhConfig,
 } from "@/lib/loot";
 
 const STORAGE_CFG = "zh-editor-config";
 const STORAGE_SKINS = "zh-skin-previews";
+const STORAGE_THEME = "zh-theme";
+
+const THEMES = [
+  { id: "light", label: "Light" },
+  { id: "dark", label: "Dark" },
+  { id: "rust", label: "Rust" },
+  { id: "ember", label: "Ember" },
+  { id: "ash", label: "Ash" },
+  { id: "blood", label: "Blood" },
+  { id: "rot", label: "Rot" },
+  { id: "tide", label: "Tide" },
+] as const;
+
+type ThemeId = (typeof THEMES)[number]["id"];
 
 type SortKey = "chance-desc" | "chance-asc" | "name-asc" | "short-asc" | "skin-desc" | "index-asc";
 
-function ItemArt({ shortname, skinId, skinUrl }: { shortname: string; skinId?: number; skinUrl?: string }) {
+function ItemArt({
+  shortname,
+  skinId,
+  skinUrl,
+  large = false,
+}: {
+  shortname: string;
+  skinId?: number;
+  skinUrl?: string;
+  large?: boolean;
+}) {
   const [broken, setBroken] = useState(false);
   const sid = Number(skinId) || 0;
+  const box = large ? "h-24 w-24" : "h-11 w-11";
   return (
-    <div className="relative h-11 w-11 shrink-0">
+    <div className={`relative shrink-0 ${box}`}>
       {broken ? (
-        <div className="grid h-11 w-11 place-items-center rounded-lg bg-bg text-xs text-faint">?</div>
+        <div className={`grid place-items-center rounded-lg bg-bg text-xs text-faint ${box}`}>?</div>
       ) : (
         <img
           src={itemIcon(shortname)}
           alt=""
-          className="h-11 w-11 rounded-lg bg-bg object-contain"
+          className={`rounded-lg bg-bg object-contain ${box}`}
           onError={() => setBroken(true)}
         />
       )}
@@ -64,8 +93,12 @@ function chanceTone(p: number) {
 }
 
 export function LootEditor() {
-  const [config, setConfig] = useState<ZhConfig>(() => bundledConfig());
-  const [dirty, setDirty] = useState(false);
+  const config = useEditor((s) => s.config);
+  const dirty = useEditor((s) => s.dirty);
+  const commit = useEditor((s) => s.commit);
+  const markClean = useEditor((s) => s.markClean);
+  const replaceBundled = useEditor((s) => s.replaceBundled);
+  const hydrate = useEditor((s) => s.hydrate);
   const [filter, setFilter] = useState("");
   const [category, setCategory] = useState("all");
   const [sort, setSort] = useState<SortKey>("chance-desc");
@@ -83,37 +116,36 @@ export function LootEditor() {
   const [quickShort, setQuickShort] = useState("");
   const [blInput, setBlInput] = useState("");
   const [skins, setSkins] = useState<Record<string, string>>({});
+  const [theme, setTheme] = useState<ThemeId>("ember");
+  const [roll, setRoll] = useState<CorpseRoll | null>(null);
+  const [itemView, setItemView] = useState<"list" | "boxes">("list");
   const [lookupBusy, setLookupBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const toastTimer = useRef<number | null>(null);
-  const hydrated = useRef(false);
 
   useEffect(() => {
+    hydrate();
     try {
-      const saved = localStorage.getItem(STORAGE_CFG);
-      if (saved) setConfig(normalizeLoaded(JSON.parse(saved) as ZhConfig));
       const extra = localStorage.getItem(STORAGE_SKINS);
       if (extra) setSkins(JSON.parse(extra) as Record<string, string>);
+      const savedTheme = localStorage.getItem(STORAGE_THEME);
+      if (savedTheme && THEMES.some((t) => t.id === savedTheme)) {
+        setTheme(savedTheme as ThemeId);
+      }
     } catch {
       /* keep bundled */
     }
-    hydrated.current = true;
-  }, []);
+  }, [hydrate]);
 
   useEffect(() => {
-    if (!hydrated.current || !dirty) return;
-    localStorage.setItem(STORAGE_CFG, JSON.stringify(config));
-  }, [config, dirty]);
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem(STORAGE_THEME, theme);
+  }, [theme]);
 
   function ping(msg: string) {
     setToast(msg);
     if (toastTimer.current) window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(""), 2200);
-  }
-
-  function commit(next: ZhConfig, mark = true) {
-    setConfig(next);
-    setDirty(mark);
   }
 
   function skinUrl(id: number) {
@@ -189,7 +221,7 @@ export function LootEditor() {
     a.download = "ZombieHorde.json";
     a.click();
     URL.revokeObjectURL(a.href);
-    setDirty(false);
+    markClean();
     ping("Downloaded ZombieHorde.json");
   }
 
@@ -318,6 +350,7 @@ export function LootEditor() {
         if (f && f.name.endsWith(".json")) loadFile(f);
       }}
     >
+      <AppNav />
       <header className="mb-4 flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="grid h-12 w-12 place-items-center rounded-2xl bg-accent font-display text-lg font-bold text-accent-ink">
@@ -326,7 +359,7 @@ export function LootEditor() {
           <div>
             <h1 className="font-display text-3xl leading-none font-bold tracking-wide">Zombie Horde Loot Editor</h1>
             <p className={`mt-1 text-sm ${dirty ? "text-accent" : "text-muted"}`}>
-              FAFO · ZombieHorde.json · random loot table{dirty ? " · unsaved edits" : ""}
+              ZombieHorde.json{dirty ? " · unsaved edits" : ""}
             </p>
           </div>
         </div>
@@ -338,17 +371,17 @@ export function LootEditor() {
             type="button"
             className="btn"
             onClick={() => {
-              if (window.confirm("Reload the bundled FAFO ZombieHorde.json and discard edits?")) {
-                const next = bundledConfig();
+              if (window.confirm("Reload the bundled ZombieHorde.json and discard edits?")) {
                 setSelected(new Set());
-                setConfig(next);
-                setDirty(false);
-                localStorage.removeItem(STORAGE_CFG);
-                ping(`Loaded bundled config — ${rowsOf(next).length} loot rows`);
+                replaceBundled();
+                ping(`Loaded bundled config — ${rowsOf(bundledConfig()).length} loot rows`);
               }
             }}
           >
             <RotateCcw className="h-4 w-4" /> Reload bundled
+          </button>
+          <button type="button" className="btn-primary" onClick={() => setRoll(rollCorpse(config))}>
+            <Dices className="h-4 w-4" /> Roll corpse
           </button>
           <button type="button" className="btn" onClick={() => void copyLoot()}>
             <Copy className="h-4 w-4" /> Copy loot JSON
@@ -378,10 +411,75 @@ export function LootEditor() {
         <Stat value={String(named)} label="Custom display names" />
       </section>
 
+      {roll ? (
+        <section className="panel mb-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
+            <div>
+              <h2 className="font-display text-xl tracking-wide">Corpse drop</h2>
+              <p className="text-xs text-muted">
+                {roll.mode === "inventory"
+                  ? "Drop inventory is on, so the random table is not used."
+                  : roll.mode === "murderer"
+                    ? "Default murderer loot is on, so the random table is not used."
+                    : `${roll.drops.filter((d) => !d.companion).length} of ${roll.slotsWanted} slots filled · stack size is rolled between each row’s min and max`}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button type="button" className="btn" onClick={() => setRoll(rollCorpse(config))}>
+                <RefreshCw className="h-4 w-4" /> Reroll
+              </button>
+              <button type="button" className="btn" onClick={() => setRoll(null)}>
+                Close
+              </button>
+            </div>
+          </div>
+          {roll.mode === "table" ? (
+            roll.drops.length === 0 ? (
+              <p className="px-4 py-6 text-sm text-muted">Nothing passed the probability roll.</p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {roll.drops.map((drop, i) => {
+                  const name = "ItemName" in drop.row && drop.row.ItemName ? drop.row.ItemName : displayName(drop.row as LootRow);
+                  const known = catalogHit(drop.row.Shortname);
+                  return (
+                    <li key={i} className={`flex items-center gap-3 px-4 py-2 ${drop.companion ? "bg-bg-2 pl-10" : ""}`}>
+                      <ItemArt shortname={drop.row.Shortname} skinId={drop.row.SkinID} skinUrl={skinUrl(drop.row.SkinID)} />
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate font-semibold">{known && !("ItemName" in drop.row && drop.row.ItemName) ? known.n : name}</div>
+                        <code className="text-xs text-faint">
+                          {drop.row.Shortname}
+                          {"Spawn as blueprint" in drop.row && drop.row["Spawn as blueprint"] ? " · blueprint" : ""}
+                          {drop.companion ? " · spawns with" : ""}
+                        </code>
+                      </div>
+                      <span className="font-display text-xl">×{drop.amount}</span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )
+          ) : null}
+        </section>
+      ) : null}
+
       <div className="grid gap-3 lg:grid-cols-[300px_1fr]">
         <aside className="panel">
           <h2 className="panel-title">Loot settings</h2>
           <div className="space-y-3 p-4">
+            <label className="block text-xs text-muted">
+              Theme
+              <select
+                className="field-input mt-1"
+                value={theme}
+                onChange={(e) => setTheme(e.target.value as ThemeId)}
+              >
+                {THEMES.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <Toggle
               label="Drop inventory instead of table"
               checked={!!loot[KEYS.dropInv]}
@@ -547,6 +645,10 @@ export function LootEditor() {
               <option value="index-asc">File order</option>
             </select>
             <span className="text-xs text-muted">{filtered.length} shown</span>
+            <button type="button" className="btn" onClick={() => setItemView(itemView === "list" ? "boxes" : "list")}>
+              {itemView === "list" ? <LayoutGrid className="h-4 w-4" /> : <List className="h-4 w-4" />}
+              {itemView === "list" ? "Boxes" : "List"}
+            </button>
             <button
               type="button"
               className="btn"
@@ -582,6 +684,37 @@ export function LootEditor() {
             </button>
           </div>
 
+          {itemView === "boxes" ? (
+            <div className="grid grid-cols-2 gap-3 p-3 sm:grid-cols-3 xl:grid-cols-4">
+              {filtered.length === 0 ? (
+                <p className="col-span-full px-4 py-10 text-center text-muted">No items match this filter.</p>
+              ) : (
+                filtered.map(({ it, i }) => {
+                  const p = Number(it["Probability (0.0 - 1.0)"]) || 0;
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      className={`rounded-2xl border p-3 text-left ${selected.has(i) ? "border-accent bg-bg-2" : "border-line bg-bg hover:border-accent"}`}
+                      onClick={() => openEditor(i)}
+                    >
+                      <ItemArt large shortname={it.Shortname} skinId={it.SkinID} skinUrl={skinUrl(it.SkinID)} />
+                      <div className="mt-2 truncate font-semibold">{displayName(it)}</div>
+                      <div className="truncate text-xs text-faint">{it.Shortname}</div>
+                      <div className="mt-2 flex items-center justify-between gap-2">
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${chanceTone(p)}`}>
+                          {Math.round(p * 100)}%
+                        </span>
+                        <span className="text-xs text-muted">
+                          {it.Minimum}–{it.Maximum}
+                        </span>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead className="text-xs tracking-wide text-muted uppercase">
@@ -729,6 +862,7 @@ export function LootEditor() {
               </tbody>
             </table>
           </div>
+          )}
         </section>
       </div>
 
