@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Zombie Horde Loot Editor</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <div class="top">
+      <div class="brand">
+        <div class="logo">ZH</div>
+        <div>
+          <h1>Zombie Horde Loot Editor</h1>
+          <p id="brandSub">FAFO · ZombieHorde.json · random loot table</p>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn" id="btnLoad">Load JSON</button>
+        <button class="btn" id="btnReset">Reload bundled</button>
+        <button class="btn" id="btnCopy">Copy loot JSON</button>
+        <button class="btn primary" id="btnSave">Download ZombieHorde.json</button>
+        <input id="fileInput" type="file" accept=".json,application/json" hidden>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><b id="statRows">0</b><span>Loot rows</span></div>
+      <div class="stat"><b id="statRoll">4–5</b><span>Items rolled per corpse</span></div>
+      <div class="stat"><b id="statExpected">0</b><span>Sum of probabilities</span></div>
+      <div class="stat"><b id="statSkins">0</b><span>Rows with a skin</span></div>
+      <div class="stat"><b id="statNamed">0</b><span>Custom display names</span></div>
+    </div>
+
+    <div class="layout">
+      <aside class="card">
+        <h2>Loot settings</h2>
+        <div class="body">
+          <div class="toggle">
+            <label for="optDropInv">Drop inventory instead of table</label>
+            <input id="optDropInv" type="checkbox">
+          </div>
+          <div class="toggle">
+            <label for="optDropMurder">Drop default murderer loot</label>
+            <input id="optDropMurder" type="checkbox">
+          </div>
+          <p class="help">Keep both off to use the random table below — that is how this config is set now.</p>
+          <div class="field">
+            <label>Min items per corpse</label>
+            <input id="optMin" type="number" min="0">
+          </div>
+          <div class="field">
+            <label>Max items per corpse</label>
+            <input id="optMax" type="number" min="0">
+          </div>
+          <div class="field">
+            <label>AlphaLoot profiles (one per line)</label>
+            <textarea id="optAlpha" rows="3" placeholder="leave empty if unused"></textarea>
+          </div>
+          <div class="field">
+            <label>Inventory drop blacklist <span id="blCount"></span></label>
+            <div style="display:flex;gap:6px">
+              <input id="blInput" type="text" placeholder="shortname">
+              <button class="btn small" id="blAdd">Add</button>
+            </div>
+            <div class="blacklist" id="blacklist"></div>
+          </div>
+          <div class="dropzone" id="dropzone">Drop a ZombieHorde.json here to replace the working copy.</div>
+          <p class="help" style="margin-top:12px">
+            Plugin rolls a random 0–1 per row and keeps items whose probability is greater than or equal to that roll.
+            Higher % = more common. Min/max on the row is stack size, not “how many slots.”
+          </p>
+        </div>
+      </aside>
+
+      <section class="card">
+        <div class="toolbar">
+          <input id="filterQ" type="search" placeholder="Search name, shortname, skin id…">
+          <select id="filterCat"></select>
+          <select id="filterSort">
+            <option value="chance-desc">Chance high → low</option>
+            <option value="chance-asc">Chance low → high</option>
+            <option value="name-asc">Name A–Z</option>
+            <option value="short-asc">Shortname A–Z</option>
+            <option value="skin-desc">Skinned first</option>
+            <option value="index-asc">File order</option>
+          </select>
+          <span class="tag" id="shownCount"></span>
+          <button class="btn small" id="btnSelAll">Select shown</button>
+          <button class="btn small" id="btnSelNone">Clear</button>
+          <button class="btn small" id="btnBulkChance">Set %…</button>
+          <button class="btn small danger" id="btnBulkDel">Delete selected</button>
+          <button class="btn small primary" id="btnAdd">Add from catalog</button>
+          <button class="btn small" id="btnQuick">Add shortname</button>
+        </div>
+        <div class="table-wrap">
+          <table class="items">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Item / skin</th>
+                <th>Chance</th>
+                <th>Stack</th>
+                <th>SkinID</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="modal-back" id="editModal">
+    <div class="modal">
+      <header>
+        <strong>Edit loot row</strong>
+        <button class="btn small" id="edCancel">Close</button>
+      </header>
+      <div class="body" style="padding:16px">
+        <div class="item-meta" style="margin-bottom:12px">
+          <div class="icon-stack">
+            <img id="edItemIcon" alt="">
+            <img id="edPreview" class="skin-badge" alt="">
+          </div>
+          <div class="help" id="edKnown"></div>
+        </div>
+        <div class="edit-grid">
+          <div class="field"><label>Shortname</label><input id="edShort" type="text"></div>
+          <div class="field"><label>Custom display name (ItemName)</label><input id="edName" type="text" placeholder="optional rename in loot"></div>
+          <div class="field"><label>Min stack</label><input id="edMin" type="number"></div>
+          <div class="field"><label>Max stack</label><input id="edMax" type="number"></div>
+          <div class="field"><label>Probability 0–1</label><input id="edProb" type="number" min="0" max="1" step="0.01"></div>
+          <div class="field"><label>Workshop SkinID</label><input id="edSkin" type="number"></div>
+          <div class="field"><label>Min condition</label><input id="edCmin" type="number" min="0" max="1" step="0.05"></div>
+          <div class="field"><label>Max condition</label><input id="edCmax" type="number" min="0" max="1" step="0.05"></div>
+        </div>
+        <div class="toggle">
+          <label>Spawn as blueprint</label>
+          <input id="edBp" type="checkbox">
+        </div>
+        <div class="toggle">
+          <label>Spawn with extra item (e.g. chainsaw + low grade)</label>
+          <input id="edSpawnWith" type="checkbox">
+        </div>
+        <div class="edit-grid" id="edSwWrap" style="display:none">
+          <div class="field"><label>Companion shortname</label><input id="edSwShort" type="text"></div>
+          <div class="field"><label>Companion skin</label><input id="edSwSkin" type="number"></div>
+          <div class="field"><label>Companion min</label><input id="edSwMin" type="number"></div>
+          <div class="field"><label>Companion max</label><input id="edSwMax" type="number"></div>
+        </div>
+        <input type="hidden" id="edIndex">
+        <div class="actions" style="margin-top:12px">
+          <button class="btn" id="edLookup">Lookup skin icon</button>
+          <button class="btn primary" id="edSave">Save row</button>
+        </div>
+        <p class="help">Skin icons for the current ZHH custom items are bundled. For a new workshop ID, use Lookup (needs internet) or the workshop link. Preview URLs stay in this browser only — they are not written into the plugin JSON.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-back" id="pickerModal">
+    <div class="modal">
+      <header>
+        <strong>Add item from catalog</strong>
+        <button class="btn small" id="pickerClose">Close</button>
+      </header>
+      <div class="toolbar">
+        <input id="pickerQ" type="search" placeholder="Search 1200+ Rust items…">
+        <select id="pickerCat"></select>
+        <span class="tag" id="pickerHint"></span>
+      </div>
+      <div class="picker-grid" id="pickerGrid"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="data/items.js"></script>
+  <script src="data/default-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
